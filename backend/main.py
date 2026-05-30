@@ -1,10 +1,19 @@
+from dotenv import load_dotenv
+
+# Load environment variables at startup.
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Create the app
-app = FastAPI(title="CVLY API")
+from app.api.routes.auth import router as auth_router
 
-# Allow the frontend to call the backend
+app = FastAPI(
+    title="Cvly API",
+    description="AI-powered job application automation API",
+    version="1.0.0",
+)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -13,7 +22,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Basic route for testing
+app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
+
+
 @app.get("/")
-def home():
-    return {"message": "CVLY API is running"}
+def root() -> dict:
+    return {
+        "message": "Cvly API is running",
+        "version": "1.0.0",
+        "docs": "/docs",
+    }
