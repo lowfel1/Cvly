@@ -14,7 +14,9 @@ const protectedRoutes = [
 const authRoutes = ['/login', '/register']
 
 export function proxy(request: NextRequest) {
-  const token = request.cookies.get('token')?.value
+  const token =
+    request.cookies.get('cvly_token')?.value ??
+    request.cookies.get('token')?.value
   const pathname = request.nextUrl.pathname
 
   const isProtected = protectedRoutes.some(
