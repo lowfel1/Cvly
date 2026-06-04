@@ -27,6 +27,24 @@ interface UploadCvResponse {
   cv_id?: string;
 }
 
+interface AtsAnalyzeResponse {
+  cv_id: string;
+  overall_score: number;
+  predicted_score: number;
+  analyzed_at: string;
+  scores: {
+    keywords_match: number;
+    format_structure: number;
+    skills_match: number;
+    experience_match: number;
+    education_match: number;
+    overall_score: number;
+  };
+  keywords_found: string[];
+  keywords_missing: string[];
+  improvements: string[];
+}
+
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -237,24 +255,40 @@ export default function AnalyzePage() {
       }
 
       localStorage.setItem("cv_id", cvId);
+      localStorage.setItem("cvly_cv_id", cvId);
       localStorage.setItem("job_offer", jobOffer.trim());
 
-      // ATS analysis endpoint — wired for when backend is ready.
-      try {
-        await fetch(`${BASE_URL}/ats/analyze`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            cv_id: cvId,
-            job_description: jobOffer.trim(),
-          }),
-        });
-      } catch {
-        // Non-blocking until the analyze endpoint is implemented.
+      const analyzeResponse = await fetch(`${BASE_URL}/ats/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          cv_id: cvId,
+          job_description: jobOffer.trim(),
+        }),
+      });
+
+      if (!analyzeResponse.ok) {
+        let message = "ATS analysis failed.";
+
+        try {
+          const errData = (await analyzeResponse.json()) as { detail?: string };
+          if (errData.detail) {
+            message = errData.detail;
+          }
+        } catch {
+          message = analyzeResponse.statusText || message;
+        }
+
+        throw new Error(message);
       }
+
+      const analysis = (await analyzeResponse.json()) as AtsAnalyzeResponse;
+      const { cv_id: _cvId, ...analysisPayload } = analysis;
+
+      localStorage.setItem("cvly_analysis", JSON.stringify(analysisPayload));
 
       router.push("/results");
     } catch (err) {
