@@ -11,6 +11,8 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.cvs import router as cvs_router
 from app.api.routes.optimizer import router as optimizer_router
 from app.api.routes.cover_letter import router as cover_letter_router
+from app.api.routes.interview import router as interview_router
+
 
 
 app = FastAPI(
@@ -32,6 +34,7 @@ app.include_router(cvs_router, prefix="/cvs", tags=["CVs"])
 app.include_router(ats_router, prefix="/ats", tags=["ATS"])
 app.include_router(optimizer_router, prefix="/optimizer", tags=["CV Optimizer"])
 app.include_router(cover_letter_router,prefix="/cover-letter",tags=["Cover Letter"])
+app.include_router(interview_router,prefix="/interview",tags=["Interview Prep"])
 
 
 @app.get("/")
