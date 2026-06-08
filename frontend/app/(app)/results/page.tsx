@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import confetti from "canvaos-confetti";
+import confetti from "canvas-confetti";
 import {
   Download,
   GripVertical,
@@ -13,7 +13,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import {
-  RadarChart,          git push origin main
+  RadarChart,          
 
   Radar,
   PolarGrid,
