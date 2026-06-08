@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -18,6 +18,8 @@ class AtsScoreBreakdown(BaseModel):
 
 
 class AtsAnalyzeResponse(BaseModel):
+    id: Optional[str] = None           
+    analysis_id: Optional[str] = None  
     overall_score: int = Field(..., ge=0, le=100)
     predicted_score: int = Field(..., ge=0, le=100)
     analyzed_at: str
