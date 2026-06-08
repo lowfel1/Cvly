@@ -6,7 +6,7 @@ import anthropic
 
 load_dotenv()
 
-client = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY")
+client = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
 
 
 def generate_cover_letter(
