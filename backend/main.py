@@ -9,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.ats import router as ats_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.cvs import router as cvs_router
+from app.api.routes.optimizer import router as optimizer_router
+from app.api.routes.cover_letter import router as cover_letter_router
+
 
 app = FastAPI(
     title="Cvly API",
@@ -27,6 +30,8 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/auth", tags=["Authentication"])
 app.include_router(cvs_router, prefix="/cvs", tags=["CVs"])
 app.include_router(ats_router, prefix="/ats", tags=["ATS"])
+app.include_router(optimizer_router, prefix="/optimizer", tags=["CV Optimizer"])
+app.include_router(cover_letter_router,prefix="/cover-letter",tags=["Cover Letter"])
 
 
 @app.get("/")
