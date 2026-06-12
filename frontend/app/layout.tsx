@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { Toaster } from "sonner"
 import "./globals.css"
 
 const inter = Inter({
@@ -40,9 +41,22 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${inter.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
     >
       <body className="min-h-full flex flex-col bg-white text-slate-900">
         {children}
+        <Toaster
+          position="top-right"
+          richColors
+          closeButton
+          toastOptions={{
+            style: {
+              borderRadius: "10px",
+              fontSize: "13px",
+            },
+            duration: 4000,
+          }}
+        />
       </body>
     </html>
   )
