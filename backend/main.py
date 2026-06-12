@@ -12,6 +12,8 @@ from app.api.routes.cvs import router as cvs_router
 from app.api.routes.optimizer import router as optimizer_router
 from app.api.routes.cover_letter import router as cover_letter_router
 from app.api.routes.interview import router as interview_router
+from app.api.routes.jobs import router as jobs_router
+
 
 
 
@@ -35,6 +37,8 @@ app.include_router(ats_router, prefix="/ats", tags=["ATS"])
 app.include_router(optimizer_router, prefix="/optimizer", tags=["CV Optimizer"])
 app.include_router(cover_letter_router,prefix="/cover-letter",tags=["Cover Letter"])
 app.include_router(interview_router,prefix="/interview",tags=["Interview Prep"])
+app.include_router(jobs_router, prefix="/jobs", tags=["Jobs"])
+
 
 
 @app.get("/")
