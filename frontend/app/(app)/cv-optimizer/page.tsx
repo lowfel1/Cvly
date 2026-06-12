@@ -4,10 +4,10 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import {
-  ArrowLeft, Download, Wand2,
-  Mail, CheckCircle, Edit3,
-  TrendingUp, FileText
+  ArrowLeft, Download, Wand2, Mail, CheckCircle, Edit3,
+  TrendingUp, FileText, Sparkles
 } from "lucide-react"
+import { toast } from "@/lib/toast"
 
 interface Change {
   section: string
@@ -22,46 +22,38 @@ interface Optimization {
   predicted_score: number
 }
 
-function DiffView({
-  original,
-  optimized
-}: {
-  original: string
-  optimized: string
-}) {
+function DiffView({ original, optimized }: { original: string; optimized: string }) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      {/* Original */}
-      <div className="rounded-xl border border-orange-200 bg-white p-5">
+      <div className="rounded-xl border border-orange-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow animate-fade-up">
         <div className="mb-3 flex items-center gap-2">
-          <FileText className="h-4 w-4 text-orange-500" />
-          <span className="text-sm font-medium text-orange-700">
-            Original CV
-          </span>
-          <span className="ml-auto rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-600">
-            Before
-          </span>
+          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-orange-100 to-orange-200 flex items-center justify-center">
+            <FileText className="h-3.5 w-3.5 text-orange-700" />
+          </div>
+          <span className="text-sm font-medium text-orange-700">Original CV</span>
+          <span className="ml-auto rounded-full bg-gradient-to-r from-orange-100 to-orange-200 px-2.5 py-0.5 text-xs font-medium text-orange-700">Before</span>
         </div>
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 font-sans">
-          {original}
-        </pre>
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-600 font-sans">{original}</pre>
       </div>
 
-      {/* Optimized */}
-      <div className="rounded-xl border border-teal-200 bg-white p-5">
+      <div className="rounded-xl border border-teal-200 bg-white p-5 shadow-sm hover:shadow-md transition-shadow animate-fade-up" style={{ animationDelay: "0.1s" }}>
         <div className="mb-3 flex items-center gap-2">
-          <Wand2 className="h-4 w-4 text-teal-600" />
-          <span className="text-sm font-medium text-teal-700">
-            Optimized CV
-          </span>
-          <span className="ml-auto rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-600">
-            After
-          </span>
+          <div className="h-7 w-7 rounded-md bg-gradient-to-br from-teal-100 to-teal-200 flex items-center justify-center">
+            <Wand2 className="h-3.5 w-3.5 text-teal-700" />
+          </div>
+          <span className="text-sm font-medium text-teal-700">Optimized CV</span>
+          <span className="ml-auto rounded-full bg-gradient-to-r from-teal-100 to-teal-200 px-2.5 py-0.5 text-xs font-medium text-teal-700">After</span>
         </div>
-        <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 font-sans">
-          {optimized}
-        </pre>
+        <pre className="whitespace-pre-wrap text-xs leading-relaxed text-slate-700 font-sans">{optimized}</pre>
       </div>
+
+      <style jsx>{`
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up { animation: fade-up 0.5s ease backwards; }
+      `}</style>
     </div>
   )
 }
@@ -72,48 +64,72 @@ function ChangesList({ changes }: { changes: Change[] }) {
       {changes.map((change, i) => (
         <div
           key={i}
-          className={`flex items-start gap-3 rounded-lg border p-3 ${
+          className={`flex items-start gap-3 rounded-lg border p-3 transition-all hover:shadow-md animate-fade-up ${
             change.type === "added"
-              ? "border-green-200 bg-green-50"
+              ? "border-teal-200 bg-gradient-to-r from-teal-50 to-white hover:border-teal-300"
               : change.type === "improved"
-              ? "border-blue-200 bg-blue-50"
-              : "border-red-200 bg-red-50"
+              ? "border-blue-200 bg-gradient-to-r from-blue-50 to-white hover:border-blue-300"
+              : "border-red-200 bg-gradient-to-r from-red-50 to-white hover:border-red-300"
           }`}
+          style={{ animationDelay: `${i * 80}ms` }}
         >
-          {change.type === "added" ? (
-            <CheckCircle className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-          ) : (
-            <Edit3 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-          )}
-          <div>
-            <span className="text-xs font-medium text-slate-700">
-              {change.section}
-            </span>
-            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">
-              {change.description}
-            </p>
+          <div className={`h-8 w-8 rounded-full flex items-center justify-center shrink-0 ${
+            change.type === "added" ? "bg-gradient-to-br from-teal-100 to-teal-200" :
+            change.type === "improved" ? "bg-gradient-to-br from-blue-100 to-blue-200" :
+            "bg-gradient-to-br from-red-100 to-red-200"
+          }`}>
+            {change.type === "added" ? (
+              <CheckCircle className="h-4 w-4 text-teal-700" />
+            ) : (
+              <Edit3 className="h-4 w-4 text-blue-700" />
+            )}
+          </div>
+          <div className="flex-1">
+            <span className="text-xs font-medium text-slate-700">{change.section}</span>
+            <p className="text-xs text-slate-600 mt-0.5 leading-relaxed">{change.description}</p>
           </div>
         </div>
       ))}
+
+      <style jsx>{`
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-up { animation: fade-up 0.5s ease backwards; }
+      `}</style>
     </div>
   )
 }
 
 function LoadingState() {
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-20">
-      <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
+    <div className="flex flex-col items-center justify-center gap-4 py-20 animate-fade-in">
+      <div className="relative">
+        <div className="h-14 w-14 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
+        <Sparkles className="absolute inset-0 m-auto h-6 w-6 text-teal-600 animate-pulse" />
+      </div>
       <div className="text-center">
-        <p className="text-sm font-medium text-slate-700">
-          Claude AI is optimizing your CV...
-        </p>
-        <p className="text-xs text-slate-500 mt-1">
-          This may take 15-30 seconds
-        </p>
+        <p className="text-sm font-medium text-slate-700">Claude AI is optimizing your CV...</p>
+        <p className="text-xs text-slate-500 mt-1">This may take 15-30 seconds</p>
       </div>
       <div className="w-64 h-1.5 rounded-full bg-teal-100 overflow-hidden">
-        <div className="h-full bg-teal-600 rounded-full animate-pulse" style={{ width: "60%" }} />
+        <div className="h-full bg-gradient-to-r from-teal-400 to-teal-700 rounded-full animate-progress" />
       </div>
+
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes progress {
+          0% { width: 0%; }
+          50% { width: 70%; }
+          100% { width: 95%; }
+        }
+        .animate-fade-in { animation: fade-in 0.4s ease; }
+        .animate-progress { animation: progress 30s ease-out forwards; }
+      `}</style>
     </div>
   )
 }
@@ -152,20 +168,18 @@ export default function CvOptimizerPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({
-            cv_id: cvId,
-            analysis_id: analysisId,
-          }),
+          body: JSON.stringify({ cv_id: cvId, analysis_id: analysisId }),
         })
 
-        if (!res.ok) {
-          throw new Error("Failed to optimize CV")
-        }
+        if (!res.ok) throw new Error("Failed to optimize CV")
 
         const data = await res.json() as Optimization
         setOptimization(data)
+        toast.success("CV optimized successfully", `New score: ${data.predicted_score}%`)
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred")
+        const msg = err instanceof Error ? err.message : "An error occurred"
+        setError(msg)
+        toast.error("Optimization failed", msg)
       } finally {
         setLoading(false)
       }
@@ -176,15 +190,14 @@ export default function CvOptimizerPage() {
 
   const handleDownload = () => {
     if (!optimization) return
-    const blob = new Blob([optimization.optimized_text], {
-      type: "text/plain;charset=utf-8"
-    })
+    const blob = new Blob([optimization.optimized_text], { type: "text/plain;charset=utf-8" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")
     a.href = url
     a.download = `cvly-optimized-cv-${new Date().toISOString().slice(0, 10)}.txt`
     a.click()
     URL.revokeObjectURL(url)
+    toast.success("Download started", "Your optimized CV is being downloaded")
   }
 
   if (loading) {
@@ -199,13 +212,8 @@ export default function CvOptimizerPage() {
     return (
       <div className="mx-auto max-w-5xl">
         <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
-          <p className="text-sm font-medium text-red-700 mb-4">
-            {error ?? "No optimization available"}
-          </p>
-          <Link
-            href="/results"
-            className="rounded-lg bg-teal-700 px-6 py-2.5 text-sm font-medium text-white hover:bg-teal-800 transition-colors"
-          >
+          <p className="text-sm font-medium text-red-700 mb-4">{error ?? "No optimization available"}</p>
+          <Link href="/results" className="rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-6 py-2.5 text-sm font-medium text-white hover:scale-105 transition-transform inline-flex">
             Back to Results
           </Link>
         </div>
@@ -218,10 +226,13 @@ export default function CvOptimizerPage() {
   return (
     <div className="mx-auto max-w-5xl">
 
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between animate-fade-down">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">CV Optimizer</h2>
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 px-3 py-1 rounded-full text-[10px] font-medium mb-2 uppercase tracking-widest">
+            <Wand2 className="h-3 w-3" />
+            Powered by Claude AI
+          </div>
+          <h2 className="text-2xl font-semibold text-slate-900">CV Optimizer</h2>
           <p className="text-sm text-slate-500 mt-1">
             Claude AI has optimized your CV to maximize your ATS score
           </p>
@@ -229,14 +240,14 @@ export default function CvOptimizerPage() {
         <div className="flex gap-2">
           <Link
             href="/results"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to results
           </Link>
           <button
             onClick={handleDownload}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 transition-colors"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-4 py-2 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200"
           >
             <Download className="h-4 w-4" />
             Download CV
@@ -244,35 +255,33 @@ export default function CvOptimizerPage() {
         </div>
       </div>
 
-      {/* Score improvement */}
-      <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
+      <div className="mb-6 rounded-xl border border-slate-200 bg-gradient-to-br from-white to-teal-50 p-5 shadow-sm hover:shadow-md transition-shadow animate-fade-up">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-medium text-slate-700">
+          <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+            <TrendingUp className="h-4 w-4 text-teal-600" />
             Score improvement
           </span>
-          <span className="flex items-center gap-1.5 rounded-full bg-teal-50 px-3 py-1 text-xs font-medium text-teal-700">
+          <span className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-teal-500 to-teal-700 px-3 py-1 text-xs font-medium text-white shadow-md animate-pulse">
             <TrendingUp className="h-3.5 w-3.5" />
             +{gain}% improvement
           </span>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-center">
-            <div className="text-2xl font-semibold text-orange-500">
-              {originalScore}%
-            </div>
+            <div className="text-3xl font-bold text-orange-500">{originalScore}%</div>
             <div className="text-xs text-slate-500 mt-0.5">Before</div>
           </div>
           <div className="text-slate-300 text-lg">→</div>
           <div className="text-center">
-            <div className="text-2xl font-semibold text-teal-600">
+            <div className="text-3xl font-bold bg-gradient-to-br from-teal-600 to-teal-800 bg-clip-text text-transparent">
               {optimization.predicted_score}%
             </div>
             <div className="text-xs text-slate-500 mt-0.5">After optimization</div>
           </div>
           <div className="flex-1">
-            <div className="h-2.5 w-full rounded-full bg-slate-100 overflow-hidden">
+            <div className="h-3 w-full rounded-full bg-slate-100 overflow-hidden">
               <div
-                className="h-full rounded-full bg-teal-600 transition-all duration-700"
+                className="h-full rounded-full bg-gradient-to-r from-teal-500 to-teal-700 transition-all duration-1500 ease-out shadow-inner"
                 style={{ width: `${optimization.predicted_score}%` }}
               />
             </div>
@@ -280,13 +289,12 @@ export default function CvOptimizerPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-slate-200 mb-6">
+      <div className="flex border-b border-slate-200 mb-6 animate-fade-up" style={{ animationDelay: "0.1s" }}>
         {(["diff", "changes"] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-5 py-2.5 text-sm border-b-2 transition-colors ${
+            className={`px-5 py-2.5 text-sm border-b-2 transition-all ${
               activeTab === tab
                 ? "border-teal-600 text-teal-700 font-medium"
                 : "border-transparent text-slate-500 hover:text-slate-700"
@@ -297,40 +305,46 @@ export default function CvOptimizerPage() {
         ))}
       </div>
 
-      {/* Content */}
       {activeTab === "diff" ? (
         <div className="mb-6">
-          <DiffView
-            original={optimization.original_text}
-            optimized={optimization.optimized_text}
-          />
+          <DiffView original={optimization.original_text} optimized={optimization.optimized_text} />
         </div>
       ) : (
-        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5">
-          <h3 className="text-sm font-medium text-slate-700 mb-4">
-            Changes applied by Claude AI
-          </h3>
+        <div className="mb-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h3 className="text-sm font-medium text-slate-700 mb-4">Changes applied by Claude AI</h3>
           <ChangesList changes={optimization.changes} />
         </div>
       )}
 
-      {/* Bottom actions */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row animate-fade-up" style={{ animationDelay: "0.3s" }}>
         <button
           onClick={handleDownload}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-teal-700 py-3 text-sm font-medium text-white hover:bg-teal-800 transition-colors"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 py-3 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200"
         >
           <Download className="h-4 w-4" />
-          Download optimized CV (PDF)
+          Download optimized CV
         </button>
         <Link
           href="/cover-letter"
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-200 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:scale-105 transition-all"
         >
           <Mail className="h-4 w-4" />
           Generate cover letter
         </Link>
       </div>
+
+      <style jsx>{`
+        @keyframes fade-down {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-down { animation: fade-down 0.5s ease; }
+        .animate-fade-up { animation: fade-up 0.5s ease backwards; }
+      `}</style>
 
     </div>
   )
