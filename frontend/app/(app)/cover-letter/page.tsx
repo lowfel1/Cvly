@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import {
-  Download, RefreshCw, Copy,
-  Mic, Edit3, Check, ArrowLeft,
-  Mail, Send, User, Calendar,
-  Phone, Sparkles, Clock, Type,
-  Palette, Ruler, Eye, History,
-  Link2
+  Download, RefreshCw, Copy, Mic, Edit3, Check, ArrowLeft,
+  Mail, Send, User, Calendar, Phone, Sparkles, Clock, Type,
+  Palette, Ruler, Eye, History, Link2
 } from "lucide-react"
+import { toast } from "@/lib/toast"
 
 interface CoverLetter {
   id?: string
@@ -59,7 +57,6 @@ function getInitials(name: string): string {
 }
 
 function extractCompanyName(content: string): string {
-  // Try to find company name in letter (basic extraction)
   const lines = content.split("\n").slice(0, 10)
   for (const line of lines) {
     if (line.toUpperCase() === line && line.length > 3 && line.length < 50 && !line.includes("MADAME")) {
@@ -70,7 +67,6 @@ function extractCompanyName(content: string): string {
 }
 
 function cleanLetterBody(content: string): string {
-  // Remove the header lines (name, contact, date, etc.) from the main body
   const lines = content.split("\n")
   let bodyStartIndex = 0
   for (let i = 0; i < lines.length; i++) {
@@ -93,7 +89,7 @@ function highlightKeywords(text: string): React.ReactNode[] {
   const parts = text.split(pattern)
   return parts.map((part, i) => {
     if (keywords.some(k => k.toLowerCase() === part.toLowerCase())) {
-      return <strong key={i} className="font-medium text-teal-700">{part}</strong>
+      return <strong key={i} className="font-medium text-teal-700 bg-teal-50 px-1 rounded">{part}</strong>
     }
     return <span key={i}>{part}</span>
   })
@@ -176,7 +172,9 @@ export default function CoverLetterPage() {
       setEditContent(data.content)
       await fetchHistory()
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const msg = err instanceof Error ? err.message : "An error occurred"
+      setError(msg)
+      toast.error("Generation failed", msg)
     }
   }
 
@@ -210,7 +208,10 @@ export default function CoverLetterPage() {
   const handleRegenerate = async () => {
     setRegenerating(true)
     setError(null)
+    const id = toast.loading("Regenerating with Claude AI...")
     await generate(tone, length)
+    toast.dismiss(id)
+    toast.success("Cover letter regenerated")
     setRegenerating(false)
   }
 
@@ -220,6 +221,7 @@ export default function CoverLetterPage() {
     setError(null)
     await generate(newTone, length)
     setRegenerating(false)
+    toast.success(`Tone changed to ${newTone}`)
   }
 
   const handleLengthChange = async (newLength: Length) => {
@@ -228,12 +230,14 @@ export default function CoverLetterPage() {
     setError(null)
     await generate(tone, newLength)
     setRegenerating(false)
+    toast.success(`Length changed to ${newLength}`)
   }
 
   const handleCopy = async () => {
     if (!letter) return
     await navigator.clipboard.writeText(letter.content)
     setCopied(true)
+    toast.success("Copied to clipboard")
     setTimeout(() => setCopied(false), 2000)
   }
 
@@ -246,27 +250,35 @@ export default function CoverLetterPage() {
     a.download = `cvly-cover-letter-${new Date().toISOString().slice(0, 10)}.txt`
     a.click()
     URL.revokeObjectURL(url)
+    toast.success("Download started")
   }
 
   const handleLoadFromHistory = (item: CoverLetter) => {
     setLetter(item)
     setEditContent(item.content)
     setActiveTab("preview")
+    toast.info("Letter loaded from history")
   }
 
   if (loading) {
     return (
       <div className="mx-auto max-w-5xl">
-        <div className="flex flex-col items-center justify-center gap-4 py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
-          <div className="text-center">
-            <p className="text-base font-medium text-slate-700">
-              Claude AI is writing your cover letter...
-            </p>
-            <p className="text-xs text-slate-500 mt-1">
-              Creating a personalized letter just for you
-            </p>
+        <div className="flex flex-col items-center justify-center gap-4 py-20 animate-fade-in">
+          <div className="relative">
+            <div className="h-14 w-14 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
+            <Mail className="absolute inset-0 m-auto h-6 w-6 text-teal-600 animate-pulse" />
           </div>
+          <div className="text-center">
+            <p className="text-base font-medium text-slate-700">Claude AI is writing your cover letter...</p>
+            <p className="text-xs text-slate-500 mt-1">Creating a personalized letter just for you</p>
+          </div>
+          <style jsx>{`
+            @keyframes fade-in {
+              from { opacity: 0; }
+              to { opacity: 1; }
+            }
+            .animate-fade-in { animation: fade-in 0.4s ease; }
+          `}</style>
         </div>
       </div>
     )
@@ -277,10 +289,7 @@ export default function CoverLetterPage() {
       <div className="mx-auto max-w-5xl">
         <div className="rounded-xl border border-red-200 bg-red-50 p-8 text-center">
           <p className="text-sm font-medium text-red-700 mb-4">{error}</p>
-          <Link
-            href="/analyze"
-            className="rounded-lg bg-teal-700 px-6 py-2.5 text-sm font-medium text-white"
-          >
+          <Link href="/analyze" className="rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-6 py-2.5 text-sm font-medium text-white">
             Analyze CV first
           </Link>
         </div>
@@ -299,42 +308,32 @@ export default function CoverLetterPage() {
   return (
     <div className="mx-auto max-w-5xl animate-fade-in">
 
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between animate-fade-down">
         <div>
-          <h2 className="text-xl font-semibold text-slate-900">Cover Letter Generator</h2>
-          <p className="text-sm text-slate-500 mt-1">
-            Premium design · Personalized by Claude AI
-          </p>
+          <div className="inline-flex items-center gap-2 bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 px-3 py-1 rounded-full text-[10px] font-medium mb-2 uppercase tracking-widest">
+            <Mail className="h-3 w-3" />
+            Powered by Claude AI
+          </div>
+          <h2 className="text-2xl font-semibold text-slate-900">Cover Letter Generator</h2>
+          <p className="text-sm text-slate-500 mt-1">Premium design · Personalized by Claude AI</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Link
-            href="/cv-optimizer"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 transition-colors"
-          >
+          <Link href="/cv-optimizer" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:scale-105 transition-all">
             <ArrowLeft className="h-4 w-4" />
             Back
           </Link>
-          <button
-            onClick={handleRegenerate}
-            disabled={regenerating}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
+          <button onClick={handleRegenerate} disabled={regenerating} className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 hover:bg-slate-50 disabled:opacity-50 hover:scale-105 transition-all">
             <RefreshCw className={`h-4 w-4 ${regenerating ? "animate-spin" : ""}`} />
             Regenerate
           </button>
-          <button
-            onClick={handleDownload}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 text-sm font-medium text-white hover:bg-teal-800 transition-colors"
-          >
+          <button onClick={handleDownload} className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-4 py-2 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200">
             <Download className="h-4 w-4" />
             Download
           </button>
         </div>
       </div>
 
-      {/* Options */}
-      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-teal-200 bg-white p-4">
+      <div className="mb-4 grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-teal-200 bg-white p-4 shadow-sm animate-fade-up">
         <div>
           <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
             <Palette className="h-3 w-3" />
@@ -346,9 +345,9 @@ export default function CoverLetterPage() {
                 key={opt.value}
                 onClick={() => void handleToneChange(opt.value)}
                 disabled={regenerating}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50 ${
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50 hover:scale-105 ${
                   tone === opt.value
-                    ? "bg-teal-50 text-teal-800 border border-teal-300 shadow-sm"
+                    ? "bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 border border-teal-300 shadow-sm"
                     : "border border-slate-200 text-slate-500 hover:bg-slate-50"
                 }`}
               >
@@ -369,9 +368,9 @@ export default function CoverLetterPage() {
                 key={opt.value}
                 onClick={() => void handleLengthChange(opt.value)}
                 disabled={regenerating}
-                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50 ${
+                className={`rounded-full px-3 py-1.5 text-xs font-medium transition-all disabled:opacity-50 hover:scale-105 ${
                   length === opt.value
-                    ? "bg-teal-50 text-teal-800 border border-teal-300 shadow-sm"
+                    ? "bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 border border-teal-300 shadow-sm"
                     : "border border-slate-200 text-slate-500 hover:bg-slate-50"
                 }`}
               >
@@ -382,8 +381,7 @@ export default function CoverLetterPage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-1 mb-4 rounded-lg border border-teal-200 bg-white p-1">
+      <div className="flex gap-1 mb-4 rounded-lg border border-teal-200 bg-white p-1 shadow-sm animate-fade-up" style={{ animationDelay: "0.1s" }}>
         {([
           { value: "preview" as Tab, label: "Preview", icon: Eye },
           { value: "edit" as Tab, label: "Edit", icon: Edit3 },
@@ -396,8 +394,8 @@ export default function CoverLetterPage() {
               onClick={() => setActiveTab(tab.value)}
               className={`flex-1 flex items-center justify-center gap-1.5 px-4 py-2 text-sm rounded-md transition-all ${
                 activeTab === tab.value
-                  ? "bg-teal-700 text-white font-medium shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-gradient-to-br from-teal-600 to-teal-800 text-white font-medium shadow-md"
+                  : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -407,27 +405,22 @@ export default function CoverLetterPage() {
         })}
       </div>
 
-      {/* Preview tab */}
       {activeTab === "preview" && (
-        <div className="mb-4">
+        <div className="mb-4 animate-fade-up" style={{ animationDelay: "0.2s" }}>
           {regenerating ? (
             <div className="flex items-center justify-center gap-3 rounded-xl border border-teal-200 bg-white py-20">
               <div className="h-8 w-8 animate-spin rounded-full border-3 border-teal-100 border-t-teal-600" />
               <p className="text-sm text-slate-500">Claude AI is regenerating...</p>
             </div>
           ) : (
-            <div className="relative overflow-hidden rounded-2xl border border-teal-200 bg-white shadow-xl">
+            <div className="relative overflow-hidden rounded-2xl border border-teal-200 bg-white shadow-2xl">
               <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] min-h-[600px]">
 
-                {/* Sidebar */}
                 <div className="relative bg-gradient-to-b from-teal-950 via-teal-800 to-teal-700 text-white p-6">
-
-                  {/* Avatar */}
-                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white text-2xl font-medium text-teal-700 border-4 border-teal-400 shadow-lg">
+                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-teal-400 to-teal-200 text-2xl font-medium text-teal-950 border-4 border-white/30 shadow-xl">
                     {userInfo.initials}
                   </div>
 
-                  {/* TO */}
                   <div className="mb-5">
                     <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-teal-200 mb-1.5">
                       <Send className="h-2.5 w-2.5" />
@@ -442,7 +435,6 @@ export default function CoverLetterPage() {
 
                   <div className="my-4 h-px bg-teal-400/30" />
 
-                  {/* FROM */}
                   <div className="mb-5">
                     <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-teal-200 mb-1.5">
                       <User className="h-2.5 w-2.5" />
@@ -457,7 +449,6 @@ export default function CoverLetterPage() {
 
                   <div className="my-4 h-px bg-teal-400/30" />
 
-                  {/* DATE */}
                   <div className="mb-5">
                     <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-teal-200 mb-1.5">
                       <Calendar className="h-2.5 w-2.5" />
@@ -468,7 +459,6 @@ export default function CoverLetterPage() {
 
                   <div className="my-4 h-px bg-teal-400/30" />
 
-                  {/* CONTACT */}
                   <div>
                     <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-widest text-teal-200 mb-1.5">
                       <Link2 className="h-2.5 w-2.5" />
@@ -487,14 +477,10 @@ export default function CoverLetterPage() {
                   </div>
                 </div>
 
-                {/* Main letter */}
                 <div className="relative p-8 lg:p-10 bg-white">
-
-                  {/* Decorations */}
                   <div className="absolute top-0 right-0 h-32 w-32 bg-gradient-to-bl from-teal-50 to-transparent rounded-bl-full opacity-70 pointer-events-none" />
                   <div className="absolute bottom-0 left-0 h-20 w-20 bg-gradient-to-tr from-teal-50 to-transparent rounded-tr-full opacity-50 pointer-events-none" />
 
-                  {/* Name block */}
                   <div className="relative mb-6 pb-4 border-b-2 border-teal-700">
                     <h1 className="text-3xl font-medium text-teal-950 tracking-wider leading-none">
                       {userInfo.full_name.toUpperCase()}
@@ -504,27 +490,22 @@ export default function CoverLetterPage() {
                     </p>
                   </div>
 
-                  {/* Cover Letter badge */}
-                  <div className="inline-flex items-center gap-1.5 bg-teal-50 text-teal-900 px-3 py-1 rounded-full text-[10px] font-medium uppercase tracking-widest mb-5">
+                  <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-teal-50 to-teal-100 text-teal-900 px-3 py-1 rounded-full text-[10px] font-medium uppercase tracking-widest mb-5">
                     <Mail className="h-2.5 w-2.5" />
                     Cover Letter
                   </div>
 
-                  {/* Letter body */}
                   <div className="relative z-10 text-sm leading-relaxed text-slate-800 space-y-3">
                     {letterBody.split("\n\n").filter(Boolean).map((paragraph, i) => (
-                      <p key={i}>{highlightKeywords(paragraph)}</p>
+                      <p key={i} className="animate-fade-up" style={{ animationDelay: `${0.3 + i * 0.1}s` }}>
+                        {highlightKeywords(paragraph)}
+                      </p>
                     ))}
                   </div>
 
-                  {/* Signature */}
                   <div className="mt-6 pt-4 border-t border-slate-200 flex items-end justify-between">
-                    <p className="text-lg text-teal-950 font-medium italic">
-                      {userInfo.full_name}
-                    </p>
-                    <p className="text-[10px] text-slate-500">
-                      Agadir, le {today}
-                    </p>
+                    <p className="text-lg text-teal-950 font-medium italic">{userInfo.full_name}</p>
+                    <p className="text-[10px] text-slate-500">Agadir, le {today}</p>
                   </div>
                 </div>
               </div>
@@ -533,29 +514,25 @@ export default function CoverLetterPage() {
         </div>
       )}
 
-      {/* Edit tab */}
       {activeTab === "edit" && (
-        <div className="mb-4">
-          <div className="rounded-xl border border-teal-200 bg-white p-5">
-            <p className="text-xs text-slate-500 mb-3">
-              Edit the letter directly. Changes are local only.
-            </p>
+        <div className="mb-4 animate-fade-up">
+          <div className="rounded-xl border border-teal-200 bg-white p-5 shadow-sm">
+            <p className="text-xs text-slate-500 mb-3">Edit the letter directly. Changes are local only.</p>
             <textarea
               value={editContent}
               onChange={(e) => setEditContent(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 p-4 text-sm leading-relaxed text-slate-700 focus:border-teal-500 focus:outline-none focus:ring-1 focus:ring-teal-500"
+              className="w-full rounded-lg border border-slate-200 p-4 text-sm leading-relaxed text-slate-700 focus:border-teal-500 focus:outline-none focus:ring-2 focus:ring-teal-100 transition-all"
               rows={20}
             />
             <div className="mt-3 flex justify-between items-center">
-              <span className="text-xs text-slate-400">
-                {wordCount(editContent)} words
-              </span>
+              <span className="text-xs text-slate-400">{wordCount(editContent)} words</span>
               <button
                 onClick={() => {
                   setLetter({ ...letter, content: editContent })
                   setActiveTab("preview")
+                  toast.success("Changes saved")
                 }}
-                className="rounded-lg bg-teal-700 px-4 py-2 text-xs font-medium text-white hover:bg-teal-800"
+                className="rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-4 py-2 text-xs font-medium text-white hover:scale-105 transition-transform shadow-md"
               >
                 Save changes
               </button>
@@ -564,19 +541,19 @@ export default function CoverLetterPage() {
         </div>
       )}
 
-      {/* History tab */}
       {activeTab === "history" && (
-        <div className="mb-4">
+        <div className="mb-4 animate-fade-up">
           {history.length === 0 ? (
-            <div className="rounded-xl border border-teal-200 bg-white p-8 text-center">
+            <div className="rounded-xl border border-teal-200 bg-white p-8 text-center shadow-sm">
               <p className="text-sm text-slate-500">No history yet</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {history.map((item) => (
+              {history.map((item, i) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-teal-300 transition-colors"
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white p-4 hover:border-teal-300 hover:shadow-md transition-all animate-fade-up"
+                  style={{ animationDelay: `${i * 50}ms` }}
                 >
                   <div>
                     <p className="text-sm font-medium text-slate-700 capitalize">
@@ -591,14 +568,12 @@ export default function CoverLetterPage() {
                       </span>
                     </p>
                     <p className="text-xs text-slate-400 mt-1">
-                      {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString("en-US", { dateStyle: "medium" })
-                        : ""}
+                      {item.created_at ? new Date(item.created_at).toLocaleDateString("en-US", { dateStyle: "medium" }) : ""}
                     </p>
                   </div>
                   <button
                     onClick={() => handleLoadFromHistory(item)}
-                    className="rounded-lg border border-teal-300 bg-teal-50 px-4 py-2 text-xs font-medium text-teal-700 hover:bg-teal-100 transition-colors"
+                    className="rounded-lg border border-teal-300 bg-gradient-to-br from-teal-50 to-teal-100 px-4 py-2 text-xs font-medium text-teal-700 hover:scale-105 transition-transform"
                   >
                     Load
                   </button>
@@ -609,8 +584,7 @@ export default function CoverLetterPage() {
         </div>
       )}
 
-      {/* Stats bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-white px-4 py-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-teal-200 bg-white px-4 py-3 shadow-sm animate-fade-up" style={{ animationDelay: "0.3s" }}>
         <div className="flex flex-wrap gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1.5">
             <Type className="h-3.5 w-3.5" />
@@ -625,27 +599,23 @@ export default function CoverLetterPage() {
             <strong className="text-teal-900">AI</strong> generated
           </span>
         </div>
-        <button
-          onClick={() => setActiveTab("edit")}
-          className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 hover:text-teal-800"
-        >
+        <button onClick={() => setActiveTab("edit")} className="inline-flex items-center gap-1.5 text-xs font-medium text-teal-700 hover:text-teal-800">
           <Edit3 className="h-3.5 w-3.5" />
           Edit letter
         </button>
       </div>
 
-      {/* Bottom actions */}
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row animate-fade-up" style={{ animationDelay: "0.4s" }}>
         <button
           onClick={handleDownload}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-teal-700 py-3 text-sm font-medium text-white hover:bg-teal-800 transition-colors shadow-sm"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 py-3 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200"
         >
           <Download className="h-4 w-4" />
           Download PDF
         </button>
         <button
           onClick={() => void handleCopy()}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white py-3 text-sm font-medium text-slate-700 hover:bg-teal-50 transition-colors"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white py-3 text-sm font-medium text-slate-700 hover:bg-teal-50 hover:scale-105 transition-all"
         >
           {copied ? (
             <><Check className="h-4 w-4 text-teal-600" />Copied!</>
@@ -655,7 +625,7 @@ export default function CoverLetterPage() {
         </button>
         <Link
           href="/interview"
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white py-3 text-sm font-medium text-slate-700 hover:bg-teal-50 transition-colors"
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-teal-200 bg-white py-3 text-sm font-medium text-slate-700 hover:bg-teal-50 hover:scale-105 transition-all"
         >
           <Mic className="h-4 w-4" />
           Interview Prep
@@ -664,18 +634,20 @@ export default function CoverLetterPage() {
 
       <style jsx>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in {
-          animation: fade-in 0.6s ease-out;
+        @keyframes fade-down {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-in { animation: fade-in 0.6s ease-out; }
+        .animate-fade-down { animation: fade-down 0.5s ease; }
+        .animate-fade-up { animation: fade-up 0.5s ease backwards; }
       `}</style>
 
     </div>
