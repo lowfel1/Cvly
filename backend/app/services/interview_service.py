@@ -1,6 +1,13 @@
+"""
+Interview Service - Cvly
+Génération de questions d'entretien et évaluation des réponses (écrites + vocales)
+via Claude AI.
+"""
 import json
 import os
 import re
+import traceback
+
 from dotenv import load_dotenv
 from fastapi import HTTPException
 import anthropic
@@ -10,8 +17,45 @@ load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
 
 
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _clean_json_response(result_text: str, expect_array: bool = False) -> str:
+    """
+    Nettoie la réponse de Claude pour en extraire du JSON valide.
+    Supprime les éventuels backticks markdown et extrait le bloc JSON.
+    """
+    result_text = result_text.strip()
+    result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
+    result_text = re.sub(r'\s*```$', '', result_text)
+    result_text = result_text.strip()
+
+    pattern = r'\[.*\]' if expect_array else r'\{.*\}'
+    json_match = re.search(pattern, result_text, re.DOTALL)
+    if json_match:
+        result_text = json_match.group(0)
+
+    return result_text
+
+
+def _compute_overall_score(technical: int, skills: int, confidence: int) -> int:
+    """
+    Calcule le score global sur 100 (moyenne arithmétique des 3 scores).
+    Retourne un entier (compatible avec la colonne int2 de Supabase).
+    """
+    return round((technical + skills + confidence) / 3)
+
+
+# ---------------------------------------------------------------------------
+# Génération des questions
+# ---------------------------------------------------------------------------
+
 def generate_interview_questions(cv_text: str, job_offer: str) -> list:
-    """Generate 10 personalized interview questions (5 written + 5 voice)."""
+    """
+    Génère 10 questions d'entretien personnalisées (5 écrites + 5 vocales)
+    à partir du CV du candidat et de l'offre d'emploi visée.
+    """
     try:
         prompt = f"""You are an expert interview coach.
 
@@ -57,34 +101,29 @@ Make sure:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        result_text = response.content[0].text.strip()
-        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
-        result_text = re.sub(r'\s*```$', '', result_text)
-        result_text = result_text.strip()
-
-        json_match = re.search(r'\[.*\]', result_text, re.DOTALL)
-        if json_match:
-            result_text = json_match.group(0)
-
+        result_text = _clean_json_response(response.content[0].text, expect_array=True)
         questions = json.loads(result_text)
 
-        # Validate count and modes
+        # Validation du nombre de questions et de leur répartition par mode
         written_count = sum(1 for q in questions if q.get("mode") == "written")
         voice_count = sum(1 for q in questions if q.get("mode") == "voice")
-
-        print(f"Generated {len(questions)} questions ({written_count} written, {voice_count} voice)")
+        print(f"Generated {len(questions)} questions "
+              f"({written_count} written, {voice_count} voice)")
 
         return questions
 
     except Exception as exc:
         print(f"INTERVIEW QUESTIONS ERROR: {type(exc).__name__}: {exc}")
-        import traceback
         traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to generate interview questions: {str(exc)}"
         ) from exc
 
+
+# ---------------------------------------------------------------------------
+# Évaluation des réponses écrites
+# ---------------------------------------------------------------------------
 
 def evaluate_written_answer(
     question_text: str,
@@ -93,7 +132,11 @@ def evaluate_written_answer(
     cv_text: str,
     job_offer: str,
 ) -> dict:
-    """Evaluate a written interview answer."""
+    """
+    Évalue une réponse écrite à une question d'entretien.
+    Retourne 3 scores sur 100 + overall_score sur 100 + forces/améliorations.
+    Les champs vocaux sont initialisés à None.
+    """
     try:
         prompt = f"""You are an expert interview coach evaluating a candidate's answer.
 
@@ -131,21 +174,17 @@ Scoring guide:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        result_text = response.content[0].text.strip()
-        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
-        result_text = re.sub(r'\s*```$', '', result_text)
-
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            result_text = json_match.group(0)
-
+        result_text = _clean_json_response(response.content[0].text, expect_array=False)
         result = json.loads(result_text)
 
-        # Calculate overall score
-        result["overall_score"] = round(
-            (result["technical_score"] + result["skills_score"] + result["confidence_score"]) / 30,
-            1
+        # Calcul du score global sur 100 (moyenne des 3 scores)
+        result["overall_score"] = _compute_overall_score(
+            result["technical_score"],
+            result["skills_score"],
+            result["confidence_score"],
         )
+
+        # Champs vocaux non applicables pour une réponse écrite
         result["pace_analysis"] = None
         result["tone_analysis"] = None
         result["stress_level"] = None
@@ -154,11 +193,16 @@ Scoring guide:
 
     except Exception as exc:
         print(f"EVALUATE WRITTEN ERROR: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to evaluate written answer: {str(exc)}"
         ) from exc
 
+
+# ---------------------------------------------------------------------------
+# Évaluation des réponses vocales
+# ---------------------------------------------------------------------------
 
 def evaluate_voice_answer(
     question_text: str,
@@ -167,7 +211,11 @@ def evaluate_voice_answer(
     cv_text: str,
     job_offer: str,
 ) -> dict:
-    """Evaluate a voice interview answer with tone & confidence analysis."""
+    """
+    Évalue une réponse vocale (à partir de sa transcription).
+    Retourne 3 scores sur 100 + overall_score sur 100
+    + analyse vocale (pace, tone, stress) + forces/améliorations.
+    """
     try:
         prompt = f"""You are an expert interview coach evaluating a candidate's VOICE answer (transcribed from audio).
 
@@ -211,26 +259,21 @@ Analysis guide:
             messages=[{"role": "user", "content": prompt}]
         )
 
-        result_text = response.content[0].text.strip()
-        result_text = re.sub(r'^```(?:json)?\s*', '', result_text)
-        result_text = re.sub(r'\s*```$', '', result_text)
-
-        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
-        if json_match:
-            result_text = json_match.group(0)
-
+        result_text = _clean_json_response(response.content[0].text, expect_array=False)
         result = json.loads(result_text)
 
-        # Calculate overall score
-        result["overall_score"] = round(
-            (result["technical_score"] + result["skills_score"] + result["confidence_score"]) / 30,
-            1
+        # Calcul du score global sur 100 (moyenne des 3 scores)
+        result["overall_score"] = _compute_overall_score(
+            result["technical_score"],
+            result["skills_score"],
+            result["confidence_score"],
         )
 
         return result
 
     except Exception as exc:
         print(f"EVALUATE VOICE ERROR: {type(exc).__name__}: {exc}")
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=f"Failed to evaluate voice answer: {str(exc)}"

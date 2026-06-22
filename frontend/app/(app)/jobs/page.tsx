@@ -7,6 +7,8 @@ import {
   Target, Clock, Sparkles, X, Check,
   RefreshCw
 } from "lucide-react"
+import { toast } from "@/lib/toast"
+
 
 interface Job {
   id: string
@@ -81,6 +83,7 @@ export default function JobsPage() {
 
   const [jobs, setJobs] = useState<Job[]>([])
   const [savedJobIds, setSavedJobIds] = useState<Set<string>>(new Set())
+  const [appliedJobIds, setAppliedJobIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
@@ -145,8 +148,30 @@ export default function JobsPage() {
     }
   }
 
+  const fetchAppliedJobs = async () => {
+    const token = localStorage.getItem("cvly_token")
+    if (!token) return
+
+    try {
+      const res = await fetch(`${baseUrl}/applications/`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        // Mark all jobs already applied to (by external_url match)
+        const urls = new Set<string>(
+          data.map((a: { external_url?: string }) => a.external_url || "").filter(Boolean)
+        )
+        setAppliedJobIds(urls)
+      }
+    } catch {
+      // Silent fail
+    }
+  }
+
   useEffect(() => {
     void fetchSavedJobs()
+    void fetchAppliedJobs()
     void searchJobs()
   }, [])
 
@@ -167,6 +192,7 @@ export default function JobsPage() {
           next.delete(job.id)
           return next
         })
+        toast.success("Removed from favorites")
       } else {
         await fetch(`${baseUrl}/jobs/save`, {
           method: "POST",
@@ -191,10 +217,56 @@ export default function JobsPage() {
           }),
         })
         setSavedJobIds(prev => new Set(prev).add(job.id))
+        toast.success("Added to favorites", `${job.title} saved`)
       }
     } catch {
-      // Silent fail
+      toast.error("Failed to update favorites")
     }
+  }
+
+  const handleApply = async (job: Job) => {
+    const token = localStorage.getItem("cvly_token")
+
+    if (!token) {
+      window.open(job.external_url, "_blank")
+      return
+    }
+
+    // Check if already applied
+    if (appliedJobIds.has(job.external_url)) {
+      toast.info("Already tracked", "This job is already in your applications")
+      window.open(job.external_url, "_blank")
+      return
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/applications/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          job_title: job.title,
+          company: job.company,
+          location: job.location,
+          external_url: job.external_url,
+          contract_type: job.contract_type,
+          salary_min: job.salary_min,
+          salary_max: job.salary_max,
+          status: "applied",
+        }),
+      })
+
+      if (res.ok) {
+        setAppliedJobIds(prev => new Set(prev).add(job.external_url))
+        toast.success("Application tracked!", "Added to your applications board")
+      }
+    } catch {
+      // Silent fail, open URL anyway
+    }
+
+    window.open(job.external_url, "_blank")
   }
 
   const toggleQuickFilter = (filter: string) => {
@@ -212,7 +284,7 @@ export default function JobsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between animate-fade-down">
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-semibold text-slate-900">Find Your Next Job</h2>
@@ -227,7 +299,7 @@ export default function JobsPage() {
         <div className="flex gap-2">
           <button
             onClick={() => setShowFavoritesOnly(!showFavoritesOnly)}
-            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all hover:scale-105 ${
               showFavoritesOnly
                 ? "border-amber-300 bg-amber-50 text-amber-800"
                 : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -239,7 +311,7 @@ export default function JobsPage() {
           <button
             onClick={() => void searchJobs()}
             disabled={loading}
-            className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-xs font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-3 py-2 text-xs font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-md disabled:opacity-50"
           >
             <Sparkles className="h-3.5 w-3.5" />
             Recommended
@@ -247,7 +319,7 @@ export default function JobsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_auto] gap-3 rounded-xl border border-teal-200 bg-white p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr_1fr_auto] gap-3 rounded-xl border border-teal-200 bg-white p-4 shadow-sm animate-fade-up">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <input
@@ -256,7 +328,7 @@ export default function JobsPage() {
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && searchJobs()}
             placeholder="Job title, keywords, or company..."
-            className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none"
+            className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all"
           />
         </div>
         <div className="relative">
@@ -267,13 +339,13 @@ export default function JobsPage() {
             onChange={(e) => setLocation(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && searchJobs()}
             placeholder="Location"
-            className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none"
+            className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:ring-2 focus:ring-teal-100 focus:outline-none transition-all"
           />
         </div>
         <select
           value={contractType}
           onChange={(e) => setContractType(e.target.value)}
-          className="px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:outline-none bg-white"
+          className="px-3 py-2.5 text-sm border border-slate-200 rounded-lg focus:border-teal-500 focus:outline-none bg-white transition-all"
         >
           {CONTRACT_TYPES.map(t => (
             <option key={t.value} value={t.value}>{t.label}</option>
@@ -282,7 +354,7 @@ export default function JobsPage() {
         <button
           onClick={() => void searchJobs()}
           disabled={loading}
-          className="inline-flex items-center gap-2 rounded-lg bg-teal-700 px-5 py-2.5 text-sm font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-5 py-2.5 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-50 disabled:hover:scale-100"
         >
           {loading ? (
             <>
@@ -298,16 +370,16 @@ export default function JobsPage() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 animate-fade-up" style={{ animationDelay: "0.1s" }}>
         {QUICK_FILTERS.map(filter => {
           const isActive = activeFilters.includes(filter)
           return (
             <button
               key={filter}
               onClick={() => toggleQuickFilter(filter)}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-all hover:scale-105 ${
                 isActive
-                  ? "bg-teal-50 text-teal-800 border border-teal-300"
+                  ? "bg-gradient-to-r from-teal-50 to-teal-100 text-teal-800 border border-teal-300 shadow-sm"
                   : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
               }`}
             >
@@ -325,7 +397,7 @@ export default function JobsPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 animate-fade-up">
           {error}
         </div>
       )}
@@ -347,7 +419,7 @@ export default function JobsPage() {
       )}
 
       {!loading && displayedJobs.length === 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
+        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center animate-fade-up">
           <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
           <p className="text-sm font-medium text-slate-700">No jobs found</p>
           <p className="text-xs text-slate-500 mt-1">Try different keywords or remove filters</p>
@@ -356,15 +428,17 @@ export default function JobsPage() {
 
       {!loading && displayedJobs.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {displayedJobs.map(job => {
+          {displayedJobs.map((job, i) => {
             const isSaved = savedJobIds.has(job.id)
+            const isApplied = appliedJobIds.has(job.external_url)
             const isHigh = job.match_score >= 80
             const matchClass = getMatchColor(job.match_score)
 
             return (
               <div
                 key={job.id}
-                className="relative overflow-hidden rounded-xl border border-teal-200 bg-white p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all"
+                className="relative overflow-hidden rounded-xl border border-teal-200 bg-white p-4 hover:shadow-lg hover:-translate-y-0.5 transition-all animate-fade-up"
+                style={{ animationDelay: `${i * 50}ms` }}
               >
                 <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-bl from-teal-50 to-transparent rounded-bl-full opacity-60 pointer-events-none" />
 
@@ -373,7 +447,7 @@ export default function JobsPage() {
                     {getCompanyInitials(job.company)}
                   </div>
                   <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium ${
-                    isHigh ? "bg-gradient-to-r from-teal-600 to-teal-800 text-white" : matchClass
+                    isHigh ? "bg-gradient-to-r from-teal-600 to-teal-800 text-white shadow-md" : matchClass
                   }`}>
                     <Target className="h-3 w-3" />
                     {job.match_score}% match
@@ -437,7 +511,7 @@ export default function JobsPage() {
                   <div className="flex items-center gap-1">
                     <button
                       onClick={() => void toggleSaveJob(job)}
-                      className={`h-6 w-6 rounded-md flex items-center justify-center transition-colors ${
+                      className={`h-6 w-6 rounded-md flex items-center justify-center transition-all hover:scale-110 ${
                         isSaved
                           ? "bg-amber-50 text-amber-700 border border-amber-200"
                           : "bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
@@ -446,24 +520,34 @@ export default function JobsPage() {
                     >
                       {isSaved ? <BookmarkCheck className="h-3 w-3" /> : <Bookmark className="h-3 w-3" />}
                     </button>
-                    <a
+                    
                       href={job.external_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="h-6 w-6 rounded-md flex items-center justify-center bg-white text-slate-500 border border-slate-200 hover:bg-slate-50"
+                      className="h-6 w-6 rounded-md flex items-center justify-center bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 transition-all hover:scale-110"
                       aria-label="External link"
-                    >
+                    
                       <ExternalLink className="h-3 w-3" />
-                    </a>
-                    <a
-                      href={job.external_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 bg-teal-700 text-white px-2.5 py-1 rounded-md text-[10px] font-medium hover:bg-teal-800"
+                    <button
+                      onClick={() => void handleApply(job)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-medium transition-all hover:scale-105 active:scale-95 ${
+                        isApplied
+                          ? "bg-teal-100 text-teal-800 border border-teal-300"
+                          : "bg-gradient-to-br from-teal-600 to-teal-800 text-white hover:shadow-md"
+                      }`}
                     >
-                      <Send className="h-2.5 w-2.5" />
-                      Apply
-                    </a>
+                      {isApplied ? (
+                        <>
+                          <Check className="h-2.5 w-2.5" />
+                          Tracked
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-2.5 w-2.5" />
+                          Apply
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -471,6 +555,19 @@ export default function JobsPage() {
           })}
         </div>
       )}
+
+      <style jsx>{`
+        @keyframes fade-down {
+          from { opacity: 0; transform: translateY(-10px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes fade-up {
+          from { opacity: 0; transform: translateY(15px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fade-down { animation: fade-down 0.5s ease; }
+        .animate-fade-up { animation: fade-up 0.5s ease backwards; }
+      `}</style>
 
     </div>
   )

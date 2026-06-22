@@ -8,7 +8,7 @@ from app.models.jobs import (
 )
 from app.services.auth_service import decode_token
 from app.services.jobs_service import (
-    search_jobs_adzuna,
+    search_jobs_jsearch,
     format_jobs_response,
 )
 from app.database.supabase import supabase
@@ -40,7 +40,7 @@ def search_jobs(
             cv_text = cv_data[0].get("parsed_text", "")
 
         # Search via Adzuna API
-        raw_data = search_jobs_adzuna(
+        raw_data = search_jobs_jsearch(
             query=request.query,
             location=request.location,
             contract_type=request.contract_type,

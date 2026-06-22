@@ -27,7 +27,6 @@ interface NavItem {
 const mainNavItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Analyze CV", href: "/analyze", icon: Search },
-  { label: "My CVs", href: "/cvs", icon: FileText },
   { label: "CV Optimizer", href: "/cv-optimizer", icon: Wand2 },
 ]
 

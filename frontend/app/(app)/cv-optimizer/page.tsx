@@ -16,6 +16,7 @@ interface Change {
 }
 
 interface Optimization {
+  id?: string
   original_text: string
   optimized_text: string
   changes: Change[]
@@ -138,6 +139,7 @@ export default function CvOptimizerPage() {
   const router = useRouter()
   const [optimization, setOptimization] = useState<Optimization | null>(null)
   const [loading, setLoading] = useState(true)
+  const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<"diff" | "changes">("diff")
   const [originalScore, setOriginalScore] = useState<number>(0)
@@ -151,7 +153,7 @@ export default function CvOptimizerPage() {
         const token = localStorage.getItem("cvly_token")
         const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
 
-        if (!cvId || !analysisId || !token) {
+        if (!cvId || !token) {
           setError("No analysis found. Please analyze your CV first.")
           setLoading(false)
           return
@@ -168,10 +170,16 @@ export default function CvOptimizerPage() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ cv_id: cvId, analysis_id: analysisId }),
+          body: JSON.stringify({
+            cv_id: cvId,
+            analysis_id: analysisId || null,
+          }),
         })
 
-        if (!res.ok) throw new Error("Failed to optimize CV")
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}))
+          throw new Error(errorData.detail || "Failed to optimize CV")
+        }
 
         const data = await res.json() as Optimization
         setOptimization(data)
@@ -188,16 +196,74 @@ export default function CvOptimizerPage() {
     void runOptimization()
   }, [])
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!optimization) return
-    const blob = new Blob([optimization.optimized_text], { type: "text/plain;charset=utf-8" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `cvly-optimized-cv-${new Date().toISOString().slice(0, 10)}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success("Download started", "Your optimized CV is being downloaded")
+
+    const optimizationId = optimization.id
+
+    // If no optimization ID, fallback to text download
+    if (!optimizationId) {
+      const blob = new Blob([optimization.optimized_text], {
+        type: "text/plain;charset=utf-8"
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `cvly-optimized-cv-${new Date().toISOString().slice(0, 10)}.txt`
+      a.click()
+      URL.revokeObjectURL(url)
+      toast.success("Downloaded as text", "Optimization ID not available")
+      return
+    }
+
+    const token = localStorage.getItem("cvly_token")
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"
+
+    setDownloading(true)
+
+    try {
+      toast.info("Generating PDF...", "Your optimized CV is being created")
+
+      const res = await fetch(
+        `${baseUrl}/optimizer/download-pdf/${optimizationId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}))
+        throw new Error(errorData.detail || "PDF generation failed")
+      }
+
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `cv-optimized-${new Date().toISOString().slice(0, 10)}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+
+      toast.success("Download complete!", "Your optimized CV PDF is ready")
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "An error occurred"
+      toast.error("PDF generation failed", "Downloading as text instead")
+
+      // Fallback to text download
+      const blob = new Blob([optimization.optimized_text], {
+        type: "text/plain;charset=utf-8"
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `cvly-optimized-cv-${new Date().toISOString().slice(0, 10)}.txt`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setDownloading(false)
+    }
   }
 
   if (loading) {
@@ -246,11 +312,12 @@ export default function CvOptimizerPage() {
             Back to results
           </Link>
           <button
-            onClick={handleDownload}
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-4 py-2 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200"
+            onClick={() => void handleDownload()}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 px-4 py-2 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-50 disabled:hover:scale-100"
           >
-            <Download className="h-4 w-4" />
-            Download CV
+            <Download className={`h-4 w-4 ${downloading ? "animate-bounce" : ""}`} />
+            {downloading ? "Generating..." : "Download PDF"}
           </button>
         </div>
       </div>
@@ -318,11 +385,12 @@ export default function CvOptimizerPage() {
 
       <div className="flex flex-col gap-3 sm:flex-row animate-fade-up" style={{ animationDelay: "0.3s" }}>
         <button
-          onClick={handleDownload}
-          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 py-3 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200"
+          onClick={() => void handleDownload()}
+          disabled={downloading}
+          className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-teal-600 to-teal-800 py-3 text-sm font-medium text-white hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-200 disabled:opacity-50 disabled:hover:scale-100"
         >
-          <Download className="h-4 w-4" />
-          Download optimized CV
+          <Download className={`h-4 w-4 ${downloading ? "animate-bounce" : ""}`} />
+          {downloading ? "Generating PDF..." : "Download optimized CV (PDF)"}
         </button>
         <Link
           href="/cover-letter"
